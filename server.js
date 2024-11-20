@@ -1,35 +1,43 @@
 import express from 'express';
+import conectarAoBanco from './src/config/dbConfig.js';
+
+
+// Cria variável de conexão com o banco
+const conexao = await conectarAoBanco(process.env.STRING_CONEXAO);
+
+
+
 
 const posts = [
         {
             id: 1,
             descrição : 'Descrição do Post 1', 
-            imagem : 'https://placecats.com/millie/300/150'
+            imgUrl : 'https://placecats.com/millie/300/150'
         },
         {
             id: 2,
             descrição: 'Este é o segundo post, com uma imagem diferente.',
-            imagem: 'https://picsum.photos/id/237/300/200'
+            imgUrl: 'https://picsum.photos/id/237/300/200'
         },
         {
             id: 3,
             descrição: 'Um post mais longo, com uma imagem mais detalhada.',
-            imagem: 'https://source.unsplash.com/random/300x200'
+            imgUrl: 'https://source.unsplash.com/random/300x200'
         },
         {
             id: 4,
             descrição: 'Post sobre gatos fofinhos!',
-            imagem: 'https://placekitten.com/300/200'
+            imgUrl: 'https://placekitten.com/300/200'
         },
         {
             id: 5,
             descrição: 'Um post sobre paisagens naturais.',
-            imagem: 'https://unsplash.com/photos/nature'
+            imgUrl: 'https://unsplash.com/photos/nature'
         },
         {
             id: 6,
             descrição: 'Post sobre comida deliciosa.',
-            imagem: 'https://unsplash.com/s/food'
+            imgUrl: 'https://unsplash.com/s/food'
         },
     ];
 
