@@ -1,65 +1,112 @@
 import express from 'express';
-import conectarAoBanco from './src/config/dbConfig.js';
+import { MongoClient } from 'mongodb';
 
-
-// Cria variável de conexão com o banco
-const conexao = await conectarAoBanco(process.env.STRING_CONEXAO);
-
-
-
-
-const posts = [
-        {
-            id: 1,
-            descrição : 'Descrição do Post 1', 
-            imgUrl : 'https://placecats.com/millie/300/150'
-        },
-        {
-            id: 2,
-            descrição: 'Este é o segundo post, com uma imagem diferente.',
-            imgUrl: 'https://picsum.photos/id/237/300/200'
-        },
-        {
-            id: 3,
-            descrição: 'Um post mais longo, com uma imagem mais detalhada.',
-            imgUrl: 'https://source.unsplash.com/random/300x200'
-        },
-        {
-            id: 4,
-            descrição: 'Post sobre gatos fofinhos!',
-            imgUrl: 'https://placekitten.com/300/200'
-        },
-        {
-            id: 5,
-            descrição: 'Um post sobre paisagens naturais.',
-            imgUrl: 'https://unsplash.com/photos/nature'
-        },
-        {
-            id: 6,
-            descrição: 'Post sobre comida deliciosa.',
-            imgUrl: 'https://unsplash.com/s/food'
-        },
-    ];
-
-    
 const app = express();
 app.use(express.json());
 
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
-});
+let client;
+let db;
 
-app.get('/posts', (req, res) => {
-    res.status(200).json(posts);
-});
-
-app.get('/posts/:id', (req, res) => {
-    const id = parseInt(req.params.id);
-    const post = posts.find(post => post.id === id);
-    
-    if (!post) {
-        return res.status(404).json({ message: 'Post não encontrado' });
+// Função para conectar ao MongoDB
+async function conectarAoBanco() {
+    try {
+        console.log('Iniciando conexão com o MongoDB Atlas...');
+        client = new MongoClient(process.env.STRING_CONEXAO);
+        await client.connect();
+        console.log('Conectado ao MongoDB Atlas com sucesso!');
+        
+        db = client.db(process.env.NOME_BANCO);
+        console.log(`Conectado ao banco: ${process.env.NOME_BANCO}`);
+        
+        return db;
+    } catch (erro) {
+        console.error('Erro na conexão:', erro);
+        throw erro;
     }
-    
-    res.status(200).json(post);
+}
+
+// Função para obter a versão do MongoDB
+async function getMongoDBVersion() {
+    try {
+        const adminDb = client.db('admin');
+        const serverStatus = await adminDb.command({ serverStatus: 1 });
+        return serverStatus.version;
+    } catch (erro) {
+        console.error('Erro ao obter versão do MongoDB:', erro);
+        return 'Versão não disponível';
+    }
+}
+
+// Função para buscar todos os posts do banco
+async function buscarPosts() {
+    try {
+        const colecao = db.collection('posts');
+        return await colecao.find().sort({ createdAt: -1 }).toArray();
+    } catch (erro) {
+        console.error('Erro ao buscar posts:', erro);
+        throw erro;
+    }
+}
+
+// Rota para verificar se o servidor está rodando
+app.get('/', (req, res) => {
+    res.json({ message: 'Servidor está rodando!' });
 });
+
+// Rota para retornar a versão do MongoDB
+app.get('/version', async (req, res) => {
+    try {
+        const version = await getMongoDBVersion();
+        res.json({ mongoVersion: version });
+    } catch (erro) {
+        res.status(500).json({ 
+            error: 'Erro ao obter versão do MongoDB',
+            details: erro.message 
+        });
+    }
+});
+
+// Rota para retornar todos os posts
+app.get('/posts', async (req, res) => {
+    try {
+        const posts = await buscarPosts();
+        res.status(200).json(posts);
+    } catch (erro) {
+        console.error('Erro na rota /posts:', erro);
+        res.status(500).json({ erro: 'Erro ao buscar posts' });
+    }
+});
+
+// Inicialização do servidor
+async function iniciarServidor() {
+    try {
+        await conectarAoBanco();
+        
+        const porta = 3000;
+        app.listen(porta, async () => {
+            console.log(`Servidor rodando na porta ${porta}`);
+            console.log(`Acesse http://localhost:${porta}/posts para ver os posts`);
+            const version = await getMongoDBVersion();
+            console.log(`Versão do MongoDB: ${version}`);
+        });
+    } catch (erro) {
+        console.error('Erro ao iniciar o servidor:', erro);
+        process.exit(1);
+    }
+}
+
+// Tratamento de encerramento do servidor
+process.on('SIGINT', async () => {
+    try {
+        if (client) {
+            await client.close();
+            console.log('Conexão com o MongoDB fechada');
+        }
+        process.exit(0);
+    } catch (erro) {
+        console.error('Erro ao fechar conexão:', erro);
+        process.exit(1);
+    }
+});
+
+iniciarServidor();
