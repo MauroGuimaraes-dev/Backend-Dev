@@ -5,6 +5,7 @@ import crypto from 'crypto';
 // Importa fs e path para manipulação de arquivos
 import fs from 'fs/promises';
 import path from 'path';
+import { ObjectId } from 'mongodb';
 
 // Classe que controla as operações relacionadas aos posts
 class PostsController {
@@ -14,6 +15,7 @@ class PostsController {
         this.buscarTodos = this.buscarTodos.bind(this);
         this.criar = this.criar.bind(this);
         this.uploadImagem = this.uploadImagem.bind(this);
+        this.atualizar = this.atualizar.bind(this); // Novo método
     }
 
     // Método que busca e retorna todos os posts cadastrados
@@ -193,6 +195,90 @@ class PostsController {
                 erro: 'Erro ao processar upload da imagem',
                 detalhes: erro.message,
                 tipo: erro.name
+            });
+        }
+    }
+
+    // Método para atualizar um post existente
+    async atualizar(req, res) {
+        try {
+            // Extrai o ID do post dos parâmetros da URL
+            const postId = req.params.id;
+            
+            // Verifica se o ID foi fornecido
+            if (!postId) {
+                return res.status(400).json({ erro: 'ID do post não fornecido' });
+            }
+
+            // Extrai os dados atualizados do corpo da requisição
+            const { descricao, imgUrl, alt } = req.body;
+
+            // Verifica se pelo menos um campo para atualização foi fornecido
+            if (!descricao && !imgUrl && !alt) {
+                return res.status(400).json({ 
+                    erro: 'Forneça pelo menos um campo para atualização: descricao, imgUrl ou alt' 
+                });
+            }
+
+            // Obtém a referência do banco de dados
+            const db = req.app.locals.db;
+            
+            // Verifica se o post existe
+            const postExistente = await db.collection('posts').findOne({ 
+                _id: new ObjectId(postId) 
+            });
+
+            if (!postExistente) {
+                return res.status(404).json({ erro: 'Post não encontrado' });
+            }
+
+            // Cria o objeto com os campos a serem atualizados
+            const dadosAtualizacao = {};
+            if (descricao) dadosAtualizacao.descricao = descricao;
+            if (imgUrl) dadosAtualizacao.imgUrl = imgUrl;
+            if (alt) dadosAtualizacao.alt = alt;
+
+            // Se houver uma nova imagem, remove a antiga
+            if (imgUrl && postExistente.imgUrl) {
+                const nomeArquivoAntigo = path.basename(postExistente.imgUrl);
+                const caminhoArquivoAntigo = path.join('uploads', nomeArquivoAntigo);
+                
+                try {
+                    await fs.access(caminhoArquivoAntigo);
+                    await fs.unlink(caminhoArquivoAntigo);
+                    console.log(`Arquivo antigo removido: ${caminhoArquivoAntigo}`);
+                } catch (erroRemocao) {
+                    console.warn('Aviso: Arquivo antigo não encontrado:', erroRemocao.message);
+                }
+            }
+
+            // Atualiza o post no banco de dados
+            const resultado = await db.collection('posts').updateOne(
+                { _id: new ObjectId(postId) },
+                { $set: dadosAtualizacao }
+            );
+
+            // Verifica se algum documento foi modificado
+            if (resultado.modifiedCount === 0) {
+                return res.status(404).json({ erro: 'Nenhuma modificação realizada' });
+            }
+
+            // Busca o post atualizado para retornar
+            const postAtualizado = await db.collection('posts').findOne({ 
+                _id: new ObjectId(postId) 
+            });
+
+            // Retorna o post atualizado
+            res.status(200).json({
+                mensagem: 'Post atualizado com sucesso',
+                post: postAtualizado
+            });
+
+        } catch (erro) {
+            console.error('Erro ao atualizar post:', erro);
+            res.status(500).json({ 
+                erro: 'Erro ao atualizar post',
+                detalhes: erro.message 
             });
         }
     }

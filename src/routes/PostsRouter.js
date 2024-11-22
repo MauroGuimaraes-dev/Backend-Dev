@@ -57,6 +57,7 @@ const upload = multer({
 router.get('/', postsController.buscarTodos);          // Rota para listar todos os posts
 router.post('/', postsController.criar);               // Rota para criar um post manualmente
 router.post('/upload', upload.single('imagem'), postsController.uploadImagem); // Rota para upload de imagem
+router.put('/:id', postsController.atualizar);         // Rota para atualizar um post existente
 
 // Exporta o router configurado
 export default router;

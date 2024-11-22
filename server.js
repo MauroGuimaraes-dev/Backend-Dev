@@ -1,12 +1,14 @@
 // Importa o framework Express para criar e configurar o servidor web
 import express from 'express';
 // Importa o cliente MongoDB para conexão com o banco de dados
-import { MongoClient } from 'mongodb';
+import { MongoClient, ObjectId } from 'mongodb';
 // Importa o router que contém todas as rotas relacionadas a posts
 import postsRouter from './src/routes/postsRouter.js';
 // Importa e configura o dotenv para variáveis de ambiente
 import * as dotenv from 'dotenv';
 dotenv.config();
+import path from 'path';
+import fs from 'fs/promises';
 
 // Cria uma nova instância do aplicativo Express
 const app = express();
@@ -16,6 +18,7 @@ app.use(express.json());
 
 // Habilita o middleware para servir arquivos estáticos da pasta uploads
 app.use('/uploads', express.static('uploads'));
+app.use(express.static('uploads')); // Nova linha para servir arquivos estáticos diretamente
 
 // Variável que armazenará a conexão com o MongoDB
 let client;
@@ -89,6 +92,76 @@ app.get('/version', async (req, res) => {
         });
     }
 });
+
+// Rota para atualizar um post existente com nova imagem
+app.put('/upload/:id', async (req, res) => {
+    try {
+        const id = req.params.id;
+        const novoPost = req.body;
+
+        // Verifica se o ID é válido
+        if (!id) {
+            return res.status(400).json({ error: 'ID não fornecido' });
+        }
+
+        // Verifica se há dados para atualização
+        if (!novoPost) {
+            return res.status(400).json({ error: 'Dados para atualização não fornecidos' });
+        }
+
+        const resultado = await atualizarNovoPost(id, novoPost, db);
+        res.json(resultado);
+    } catch (erro) {
+        console.error('Erro ao atualizar post:', erro);
+        res.status(500).json({ 
+            error: 'Erro ao atualizar post',
+            details: erro.message 
+        });
+    }
+});
+
+// Função para atualizar um post existente
+async function atualizarNovoPost(id, novoPost, db) {
+    try {
+        // Converte o ID string para ObjectId do MongoDB
+        const objectId = ObjectId.createFromHexString(id);
+
+        // Verifica se o post existe
+        const postExistente = await db.collection('posts').findOne({ _id: objectId });
+        if (!postExistente) {
+            throw new Error('Post não encontrado');
+        }
+
+        // Remove a imagem antiga se existir e houver uma nova imagem
+        if (postExistente.imagemUrl && novoPost.imagemUrl && postExistente.imagemUrl !== novoPost.imagemUrl) {
+            const caminhoImagemAntiga = path.join('uploads', path.basename(postExistente.imagemUrl));
+            try {
+                await fs.promises.unlink(caminhoImagemAntiga);
+                console.log(`Imagem antiga removida: ${caminhoImagemAntiga}`);
+            } catch (erroRemocao) {
+                console.warn('Aviso: Não foi possível remover a imagem antiga:', erroRemocao);
+            }
+        }
+
+        // Atualiza o post no banco de dados usando o ObjectId
+        const resultado = await db.collection('posts').updateOne(
+            { _id: objectId },
+            { $set: novoPost }
+        );
+
+        if (resultado.modifiedCount === 0) {
+            throw new Error('Nenhuma modificação foi feita no post');
+        }
+
+        return {
+            message: 'Post atualizado com sucesso',
+            id: id,
+            modificacoes: resultado.modifiedCount
+        };
+    } catch (erro) {
+        throw new Error(`Erro ao atualizar post: ${erro.message}`);
+    }
+}
 
 // Registra o router de posts para lidar com todas as requisições em /posts
 app.use('/posts', postsRouter);
