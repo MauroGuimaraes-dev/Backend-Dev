@@ -1,3 +1,5 @@
-node_modules
-API-KEY.txt
+node_modules/
 .env
+uploads/
+*.log
+.DS_Store

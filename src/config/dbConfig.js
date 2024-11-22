@@ -1,39 +1,43 @@
+// Importa o Mongoose, biblioteca ODM (Object Document Mapper) para MongoDB
 import mongoose from 'mongoose';
 
+// Função assíncrona que estabelece conexão com o MongoDB Atlas
 export default async function conectarAoBanco(stringConexao) {
     try {
+        // Log do início do processo de conexão
         console.log('Iniciando conexão com o MongoDB Atlas...');
         console.log('Configurando opções de conexão...');
         
+        // Define as opções de conexão recomendadas pelo MongoDB
         const options = {
+            // Usa o novo parser de URL do MongoDB
             useNewUrlParser: true,
+            // Usa o novo motor de gerenciamento de topologia
             useUnifiedTopology: true,
+            // Define timeout de 15 segundos para seleção de servidor
             serverSelectionTimeoutMS: 15000,
-            socketTimeoutMS: 45000,
-            family: 4
+            // Define timeout de 30 segundos para conexão
+            connectTimeoutMS: 30000,
+            // Define timeout de 30 segundos para socket
+            socketTimeoutMS: 30000,
+            // Habilita SSL/TLS para conexão segura
+            ssl: true,
+            // Especifica a fonte de autenticação
+            authSource: 'admin'
         };
 
-        console.log('Tentando conectar ao banco de dados...');
+        // Estabelece a conexão com o MongoDB usando a string de conexão e opções
         await mongoose.connect(stringConexao, options);
         
+        // Log de sucesso na conexão
         console.log('Conectado ao MongoDB Atlas com sucesso!');
-        console.log(`Conectado ao banco: ${mongoose.connection.name}`);
         
-        mongoose.connection.on('error', (err) => {
-            console.error('Erro na conexão:', err);
-        });
-
-        mongoose.connection.on('disconnected', () => {
-            console.log('Desconectado do MongoDB');
-        });
-
-        mongoose.connection.on('connected', () => {
-            console.log('Reconectado ao MongoDB');
-        });
-
-        return mongoose.connection;
+        // Retorna a instância do mongoose para uso em outras partes da aplicação
+        return mongoose;
     } catch (erro) {
-        console.error('Erro detalhado na conexão:', erro);
+        // Log detalhado em caso de erro na conexão
+        console.error('Erro ao conectar ao MongoDB:', erro);
+        // Propaga o erro para tratamento superior
         throw erro;
     }
 }
